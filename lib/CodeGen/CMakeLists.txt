@@ -10,6 +10,7 @@ set(LLVM_LINK_COMPONENTS
   AggressiveInstCombine
   InstCombine
   Instrumentation
+  InfluenceTracing
   LTO
   Linker
   MC

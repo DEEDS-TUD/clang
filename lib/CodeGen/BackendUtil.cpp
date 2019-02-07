@@ -50,6 +50,7 @@
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/IPO/ThinLTOBitcodeWriter.h"
+#include "llvm/Transforms/InfluenceTracing/InfluenceTracing.h"
 #include "llvm/Transforms/InstCombine/InstCombine.h"
 #include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Transforms/Instrumentation/BoundsChecking.h"
@@ -311,6 +312,17 @@ static void addEfficiencySanitizerPass(const PassManagerBuilder &Builder,
   else if (LangOpts.Sanitize.has(SanitizerKind::EfficiencyWorkingSet))
     Opts.ToolType = EfficiencySanitizerOptions::ESAN_WorkingSet;
   PM.add(createEfficiencySanitizerPass(Opts));
+}
+
+//Luca
+static void addInfluenceTracingTagPass(const PassManagerBuilder &Builder,
+                                       legacy::PassManagerBase &PM) {
+  PM.add(createInfluenceTracingTagPass());
+}
+
+static void addInfluenceTracingDetectEliminatedCodePass(const PassManagerBuilder &Builder,
+                                       legacy::PassManagerBase &PM) {
+  PM.add(createInfluenceTracingDetectEliminatedCodePass());
 }
 
 static TargetLibraryInfoImpl *createTLII(llvm::Triple &TargetTriple,
@@ -633,6 +645,10 @@ void EmitAssemblyHelper::CreatePasses(legacy::PassManager &MPM,
     PMBuilder.addExtension(PassManagerBuilder::EP_EnabledOnOptLevel0,
                            addEfficiencySanitizerPass);
   }
+
+  //Luca
+  PMBuilder.addExtension(PassManagerBuilder::EP_EarlyAsPossible, addInfluenceTracingTagPass);
+  PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast, addInfluenceTracingDetectEliminatedCodePass);
 
   // Set up the per-function pass manager.
   FPM.add(new TargetLibraryInfoWrapperPass(*TLII));
@@ -976,6 +992,12 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
             [](FunctionPassManager &FPM, PassBuilder::OptimizationLevel Level) {
               FPM.addPass(BoundsCheckingPass());
             });
+
+      //Luca
+      PB.registerPipelineStartEPCallback([](ModulePassManager &MPM) {
+        MPM.addPass(InfluenceTracingTagPass());
+      });
+
       if (Optional<GCOVOptions> Options = getGCOVOptions(CodeGenOpts))
         PB.registerPipelineStartEPCallback([Options](ModulePassManager &MPM) {
           MPM.addPass(GCOVProfilerPass(*Options));
@@ -992,6 +1014,8 @@ void EmitAssemblyHelper::EmitAssemblyWithNewPassManager(
       } else {
         MPM = PB.buildPerModuleDefaultPipeline(Level,
                                                CodeGenOpts.DebugPassManager);
+        //Luca
+        MPM.addPass(InfluenceTracingDetectEliminatedCodePass());
       }
     }
   }

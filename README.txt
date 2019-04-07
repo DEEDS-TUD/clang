@@ -1,3 +1,6 @@
+This project adapts Clang to use influence tracing in order to generate warnings
+for eliminated code.
+
 //===----------------------------------------------------------------------===//
 // C Language Family Front-end
 //===----------------------------------------------------------------------===//
